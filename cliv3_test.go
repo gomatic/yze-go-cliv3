@@ -10,7 +10,7 @@ import (
 )
 
 func TestLegacyURFaveImportsAreReported(t *testing.T) {
-	analysistest.Run(t, analysistest.TestData(), cliv3.Analyzer, "legacy", "good")
+	analysistest.Run(t, analysistest.TestData(), cliv3.Analyzer, "legacy", "good", "edges")
 }
 
 func TestRegistrationIsWellFormed(t *testing.T) {
