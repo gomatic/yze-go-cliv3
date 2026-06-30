@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/go/analysis"
 
-	cliv3 "github.com/gomatic/yze-cliv3"
+	cliv3 "github.com/gomatic/yze-go-cliv3"
 )
 
 func TestMainRunsTheAnalyzer(t *testing.T) {

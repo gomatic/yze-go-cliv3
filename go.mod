@@ -1,4 +1,4 @@
-module github.com/gomatic/yze-cliv3
+module github.com/gomatic/yze-go-cliv3
 
 go 1.26.4
 

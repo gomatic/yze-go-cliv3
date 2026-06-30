@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/tools/go/analysis/analysistest"
 
-	cliv3 "github.com/gomatic/yze-cliv3"
+	cliv3 "github.com/gomatic/yze-go-cliv3"
 )
 
 func TestLegacyURFaveImportsAreReported(t *testing.T) {
