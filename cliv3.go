@@ -62,23 +62,27 @@ func run(pass *analysis.Pass) (any, error) {
 
 // check flags the import when its path is a legacy urfave/cli version.
 func check(pass *analysis.Pass, spec *ast.ImportSpec) {
-	if isLegacyImport(spec.Path.Value) {
+	if isLegacyImport(importLiteral(spec.Path.Value)) {
 		pass.Reportf(spec.Path.Pos(), message)
 	}
 }
 
+// importLiteral is an import path literal as written in source, in either
+// quoting style ("…" or `…`).
+type importLiteral string
+
 // isLegacyImport reports whether an import path literal — in either quoting
 // style — names a legacy urfave/cli package. A literal that cannot be unquoted
 // cannot name one.
-func isLegacyImport(literal string) bool {
+func isLegacyImport(literal importLiteral) bool {
 	path, err := unquote(literal)
 	return err == nil && isLegacyURFave(path)
 }
 
 // unquote resolves an import path literal, interpreted ("…") or raw (`…`), to
 // the path it names.
-func unquote(literal string) (importPath, error) {
-	path, err := strconv.Unquote(literal)
+func unquote(literal importLiteral) (importPath, error) {
+	path, err := strconv.Unquote(string(literal))
 	if err != nil {
 		return "", errUnquote.With(err, literal)
 	}

@@ -22,7 +22,7 @@ func TestUnquoteResolvesBothQuotingStyles(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			path, err := unquote(literal)
+			path, err := unquote(importLiteral(literal))
 			require.NoError(t, err)
 			assert.Equal(t, pathV2, path)
 		})
@@ -45,7 +45,7 @@ func TestIsLegacyImport(t *testing.T) {
 	} {
 		t.Run(literal, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, legacy, isLegacyImport(literal))
+			assert.Equal(t, legacy, isLegacyImport(importLiteral(literal)))
 		})
 	}
 }
