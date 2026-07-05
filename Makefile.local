@@ -1,0 +1,11 @@
+# golines is the one gate tool that walks every .go file under the repo,
+# including testdata fixtures, which the rest of the gate (go vet, golangci,
+# staticcheck, coverage) already skips by Go convention.
+# testdata/src/edges/edges.go INTENTIONALLY imports urfave/cli v2 with a
+# raw-string path literal (the analyzer must flag both quoting styles), and
+# golines normalizes raw import paths to interpreted quoting — destroying the
+# fixture — so golines must skip testdata like every other tool (the same
+# divergence as yze-go-layout). Setting --ignored-dirs replaces the built-in
+# default list, so the defaults (vendor, node_modules, .git) are restated
+# alongside testdata.
+GOLINES = $(gobin-or-die)/golines --ignored-dirs=vendor --ignored-dirs=node_modules --ignored-dirs=.git --ignored-dirs=testdata

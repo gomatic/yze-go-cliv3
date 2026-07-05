@@ -5,7 +5,10 @@ package cliv3
 
 import (
 	"go/ast"
+	"strconv"
+	"strings"
 
+	errs "github.com/gomatic/go-error"
 	goyze "github.com/gomatic/go-yze"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -15,9 +18,22 @@ import (
 // message is the single diagnostic this analyzer emits.
 const message = "use urfave/cli/v3; the legacy urfave/cli v1/v2 import path is forbidden by the gomatic CLI standard"
 
-// importPath is a Go import path as it appears in source: the raw quoted string
-// literal of an *ast.ImportSpec (e.g. `"github.com/urfave/cli/v2"`).
+// errUnquote reports an import path literal that is not a valid Go string
+// literal. It never escapes the analyzer (an unparseable import cannot occur in
+// type-checked code); it exists so unquote's failure contract is assertable.
+const errUnquote errs.Const = "import path literal cannot be unquoted"
+
+// importPath is a Go import path as resolved from an *ast.ImportSpec literal
+// (e.g. "github.com/urfave/cli/v2", without the source quoting).
 type importPath string
+
+// The legacy urfave/cli module paths: v1 is matched exactly (its subpackage
+// namespace also contains v2/v3, so a prefix match would over-flag); v2 is
+// matched as the module or any subpackage beneath it.
+const (
+	pathV1 importPath = "github.com/urfave/cli"
+	pathV2 importPath = "github.com/urfave/cli/v2"
+)
 
 // Analyzer reports imports of the legacy urfave/cli v1/v2 packages.
 var Analyzer = &analysis.Analyzer{
@@ -46,19 +62,32 @@ func run(pass *analysis.Pass) (any, error) {
 
 // check flags the import when its path is a legacy urfave/cli version.
 func check(pass *analysis.Pass, spec *ast.ImportSpec) {
-	if isLegacyURFave(importPath(spec.Path.Value)) {
+	if isLegacyImport(spec.Path.Value) {
 		pass.Reportf(spec.Path.Pos(), message)
 	}
 }
 
-// isLegacyURFave reports whether the quoted import path is urfave/cli v1 or v2.
-// The path is matched as the raw quoted literal (e.g. `"github.com/urfave/cli/v2"`),
-// avoiding an unquote whose error branch is unreachable for valid Go.
-func isLegacyURFave(quoted importPath) bool {
-	switch quoted {
-	case `"github.com/urfave/cli"`, `"github.com/urfave/cli/v2"`:
-		return true
-	default:
-		return false
+// isLegacyImport reports whether an import path literal — in either quoting
+// style — names a legacy urfave/cli package. A literal that cannot be unquoted
+// cannot name one.
+func isLegacyImport(literal string) bool {
+	path, err := unquote(literal)
+	return err == nil && isLegacyURFave(path)
+}
+
+// unquote resolves an import path literal, interpreted ("…") or raw (`…`), to
+// the path it names.
+func unquote(literal string) (importPath, error) {
+	path, err := strconv.Unquote(literal)
+	if err != nil {
+		return "", errUnquote.With(err, literal)
 	}
+	return importPath(path), nil
+}
+
+// isLegacyURFave reports whether the import path is urfave/cli v1 (exact) or
+// v2 — the module itself or any subpackage beneath it, matched at a path
+// boundary so e.g. a hypothetical …/cli/v20 is not flagged.
+func isLegacyURFave(path importPath) bool {
+	return path == pathV1 || path == pathV2 || strings.HasPrefix(string(path), string(pathV2)+"/")
 }
