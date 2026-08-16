@@ -48,6 +48,8 @@ func TestDiagnosticNamesTheReplacementAtThePathLiteral(t *testing.T) {
 		`"github.com/urfave/cli/v2"`:        "github.com/urfave/cli/v3",
 		"`github.com/urfave/cli/v2`":        "github.com/urfave/cli/v3",
 		`"gopkg.in/urfave/cli.v1"`:          "github.com/urfave/cli/v3",
+		`"github.com/codegangsta/cli"`:      "github.com/urfave/cli/v3",
+		`"gopkg.in/codegangsta/cli.v1"`:     "github.com/urfave/cli/v3",
 		`"github.com/urfave/cli/altsrc"`:    "github.com/urfave/cli-altsrc/v3",
 		`"github.com/urfave/cli/v2/altsrc"`: "github.com/urfave/cli-altsrc/v3",
 		`"gopkg.in/urfave/cli.v1/altsrc"`:   "github.com/urfave/cli-altsrc/v3",

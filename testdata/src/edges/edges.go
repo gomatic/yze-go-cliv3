@@ -10,6 +10,8 @@ import (
 	v2altsrc "github.com/urfave/cli/v2/altsrc" // want `use github\.com/urfave/cli-altsrc/v3;`
 	gopkg "gopkg.in/urfave/cli.v1"             // want `use github\.com/urfave/cli/v3;`
 	gopkgalt "gopkg.in/urfave/cli.v1/altsrc"   // want `use github\.com/urfave/cli-altsrc/v3;`
+	orig "github.com/codegangsta/cli"          // want `use github\.com/urfave/cli/v3;`
+	gopkgorig "gopkg.in/codegangsta/cli.v1"    // want `use github\.com/urfave/cli/v3;`
 
 	safe "example.com/cli"
 	cli20 "github.com/urfave/cli/v20"
@@ -28,6 +30,15 @@ import (
 // boundary; urfave/cli/v20 is a major-version directory that is not v2; and
 // urfave/cli/v3 is the sanctioned version, living beneath v1's path.
 //
+// A CASE-VARIANT ROOT CANNOT BE A FIXTURE HERE, and that is a property of the
+// harness rather than a gap in the rule. analysistest loads a GOPATH-style tree,
+// so github.com/Urfave/cli and github.com/urfave/cli would be one directory on a
+// case-insensitive filesystem — writing the second silently OVERWROTE the first
+// when this was attempted — and the Go build refuses both spellings in one build
+// with a case-insensitive import collision even where it does not. Case folding
+// is therefore pinned by TestEveryPackageOfEveryLegacyRootIsLegacy, against the
+// matcher directly, where no filesystem is involved.
+//
 // DO NOT RUN gofmt ON THIS FILE. The raw-string import above is the only place
 // the second quoting style is exercised against a real parse, and gofmt
 // normalises it to an interpreted string — silently deleting the property the
@@ -41,6 +52,8 @@ var (
 	_ = v2altsrc.Source{}
 	_ = gopkg.App{}
 	_ = gopkgalt.Source{}
+	_ = orig.App{}
+	_ = gopkgorig.App{}
 	_ = safe.App{}
 	_ = climate.App{}
 	_ = cli20.App{}

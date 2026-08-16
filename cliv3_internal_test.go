@@ -1,6 +1,7 @@
 package cliv3
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -77,14 +78,31 @@ func TestEveryPackageOfEveryLegacyRootIsLegacy(t *testing.T) {
 		sub    subPackage
 		legacy bool
 	}{
-		// The three legacy module roots.
+		// The five legacy module roots.
 		{path: pathV1, legacy: true, sub: "", why: "v1's module path itself"},
 		{path: pathV2, legacy: true, sub: "", why: "v2's module path itself"},
 		{path: pathGopkgV1, legacy: true, sub: "", why: "the same v1 code under its gopkg.in module path"},
+		{path: pathOriginal, legacy: true, sub: "", why: "the name urfave/cli was renamed from, still served, byte-identical at v1.20.0"},
+		{path: pathGopkgOriginal, legacy: true, sub: "", why: "and the original name under gopkg.in"},
+		{path: pathOriginal + "/altsrc", legacy: true, sub: "altsrc", why: "the original name's subpackages too"},
+
+		// Case folding. Import paths are case-sensitive to the toolchain, but
+		// the hosts are not: before go.mod existed there is no declared module
+		// path to disagree with, so github.com/Urfave/cli@v1.20.0 resolves,
+		// builds and hands back the same *cli.App. Folding closes an unbounded
+		// family of spellings with one decision.
+		{path: "github.com/Urfave/cli", legacy: true, sub: "", why: "the host serves the same repository under either capitalisation"},
+		{path: "github.com/urfave/Cli", legacy: true, sub: "", why: "and under any other"},
+		{path: "GitHub.com/URFAVE/CLI/v2", legacy: true, sub: "", why: "the whole root folds, not one segment of it"},
+		{path: "github.com/CodeGangsta/cli", legacy: true, sub: "", why: "the original name folds as well"},
+		{path: "github.com/Urfave/cli/altsrc", legacy: true, sub: "altsrc", why: "a folded root still resolves its subpackage"},
 
 		// Every package beneath a legacy root is legacy, and names its own
-		// subpackage — v2 must be resolved before v1, or a v2 subpackage would
-		// come back as the v1 subpackage "v2/altsrc" and prescribe cli-v2/v3.
+		// subpackage. A v2 subpackage must come back as "altsrc" and not as
+		// v1's "v2/altsrc", which would prescribe the nonexistent cli-v2/v3;
+		// what guarantees that is the major-version-directory exclusion applied
+		// at every root, not the order the roots are listed in — measured, by
+		// reversing the listing and getting byte-identical output.
 		{path: pathV1 + "/altsrc", legacy: true, sub: "altsrc", why: "a v1 subpackage is v1 code"},
 		{path: pathV2 + "/altsrc", legacy: true, sub: "altsrc", why: "a v2 subpackage is v2 code"},
 		{path: pathGopkgV1 + "/altsrc", legacy: true, sub: "altsrc", why: "and so is a gopkg.in v1 subpackage"},
@@ -108,7 +126,10 @@ func TestEveryPackageOfEveryLegacyRootIsLegacy(t *testing.T) {
 		// Paths that merely resemble a legacy root.
 		{path: "github.com/urfave/climate", legacy: false, why: "shares the bytes without ending at a segment boundary"},
 		{path: "github.com/urfave/cli-alt", legacy: false, why: "a hyphen is not a path separator"},
+		{path: "github.com/urfave/cli-altsrc/v3", legacy: false, why: "the replacement this analyzer prescribes is not itself legacy"},
+		{path: "github.com/urfave/cli-docs/v3", legacy: false, why: "nor is the other extracted module"},
 		{path: "example.com/github.com/urfave/cli", legacy: false, why: "a legacy root is anchored at the start"},
+		{path: "github.com/codegangsta/climate", legacy: false, why: "the original name gets the same boundary"},
 		{path: "", legacy: false, why: "an empty path"},
 	} {
 		sub, legacy := legacyURFave(tc.path)
@@ -125,12 +146,23 @@ func TestEveryPackageOfEveryLegacyRootIsLegacy(t *testing.T) {
 // suggests — it is the package urfave actually published.
 //
 // The reported subpackage set is closed and was MEASURED against the module
-// cache on 2026-08-15: cli@v1.22.17, cli/v2@{v2.3.0,v2.23.7,v2.27.7} and
-// gopkg.in/urfave/cli.v1@v1.20.0 each carry exactly one Go subpackage, altsrc.
-// (docs/ and autocomplete/ exist as directories in those trees and hold no Go
-// files, so neither can be imported.) Both destinations resolve on
-// proxy.golang.org: github.com/urfave/cli/v3@v3.10.1 and
-// github.com/urfave/cli-altsrc/v3@v3.1.0 — while github.com/urfave/cli/v3/altsrc,
+// cache on 2026-08-15, and the claim is about what is IMPORTABLE rather than
+// about what directories exist — an earlier revision of this comment said "each
+// carries exactly one Go subpackage", which is false and was caught by an
+// adversarial pass. What was measured, counting non-test Go files per directory
+// and reading each one's package clause:
+//
+//   - cli@v1.22.17 and gopkg.in/urfave/cli.v1@v1.20.0: altsrc, and nothing else.
+//   - cli/v2@{v2.3.0,v2.27.7}: altsrc, plus internal/build,
+//     internal/example-cli and internal/example-hello-world — all three
+//     `package main` AND under internal/, so doubly unimportable.
+//   - cli/v3@v3.10.1: examples/example-cli, examples/example-hello-world and
+//     scripts — all `package main`, so the module offers no importable
+//     subpackage, which is why a legacy subpackage cannot move to a path inside
+//     it.
+//
+// Both destinations resolve on proxy.golang.org: github.com/urfave/cli/v3@v3.10.1
+// and github.com/urfave/cli-altsrc/v3@v3.1.0 — while github.com/urfave/cli/v3/altsrc,
 // which this analyzer used to prescribe for every reported path, 404s and has
 // never existed.
 func TestV3LineNamesAPackageThatExists(t *testing.T) {
@@ -147,6 +179,38 @@ func TestV3LineNamesAPackageThatExists(t *testing.T) {
 		{sub: "altsrc/deeper", want: "github.com/urfave/cli-altsrc/v3", why: "the extracted module is named for the first segment"},
 	} {
 		assert.Equal(t, tc.want, v3Line(tc.sub), "v3Line(%q): %s", tc.sub, tc.why)
+	}
+}
+
+// TestRootOrderDoesNotChangeTheVerdict names the invariant legacyRoots
+// documents. v1's module path is a prefix of v2's, so a listing that tried v1
+// first could plausibly claim ".../cli/v2/altsrc" as v1's subpackage "v2/altsrc"
+// and prescribe the nonexistent cli-v2/v3. It does not, and the reason is the
+// major-version-directory exclusion applied at every root rather than the order
+// itself — which is exactly the kind of claim that is cheap to write down and
+// wrong, so it is driven here against a reversed listing instead.
+func TestRootOrderDoesNotChangeTheVerdict(t *testing.T) {
+	t.Parallel()
+
+	reversed := slices.Clone(legacyRoots())
+	slices.Reverse(reversed)
+	require.NotEqual(
+		t,
+		legacyRoots(),
+		reversed,
+		"the listing has more than one root, so reversing it is a real perturbation",
+	)
+
+	for _, path := range []importPath{
+		pathV1, pathV2, pathGopkgV1, pathOriginal, pathGopkgOriginal,
+		pathV1 + "/altsrc", pathV2 + "/altsrc", pathGopkgV1 + "/altsrc", pathOriginal + "/altsrc",
+		pathV1 + "/v2", pathV1 + "/v2/altsrc", pathV1 + "/v3", pathV1 + "/v3/altsrc", pathV1 + "/v20",
+		pathV1 + "/version", "github.com/Urfave/cli", "github.com/urfave/climate", pathV3, "",
+	} {
+		wantSub, wantLegacy := resolve(legacyRoots(), path)
+		gotSub, gotLegacy := resolve(reversed, path)
+		assert.Equal(t, wantLegacy, gotLegacy, "legacy verdict for %q moved with the root order", path)
+		assert.Equal(t, wantSub, gotSub, "subpackage for %q moved with the root order", path)
 	}
 }
 
